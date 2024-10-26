@@ -8,6 +8,7 @@ class Bot {
     #socket;
     #saveCred;
     #authFolder;
+    #messageStore = {};
     
     constructor(config){
         this.#authFolder = config.authFolder || "auth";
@@ -19,7 +20,8 @@ class Bot {
 
         this.#socket = makeWASocket({
             printQRInTerminal: true,
-            auth: state
+            auth: state,
+            getMessage: this.#getMessageFromStore,
         })
     }
 
@@ -37,7 +39,47 @@ class Bot {
         await this.connect();
         await this.run();
     }
+    
+    #getText(key, message) {
+      try {
+        let text = message.conversation || message.extendedTextMessage.text;
+  
+        if (key.participant) {
+          const me = key.participant.slice(0, 12);
+          text = text.replace(/\@me\b/g, `@${me}`);
+        }
+  
+        return text;
+      } catch (err) {
+        return "";
+      }
+    }
 
+    #getMessageFromStore = (key) => {
+      const { id } = key;
+      if (this.#messageStore[id]) return this.#messageStore[id].message;
+    };
+
+    #sendMessage = async (jid, messageText, ...args) => {
+      try {
+        // if (!this.#selfReply) content.text = content.text + this.#emptyChar;
+  
+        const sent = await this.#socket.sendMessage(jid,{ text : messageText}, ...args);
+        this.#messageStore[sent.key.id] = sent;
+      } catch (err) {
+        console.log("Error sending message", err);
+      }
+    };
+
+    #checkFormatOfInput(remoteJid,messageText)
+    {
+        this.#sendMessage(remoteJid,messageText);
+    }
+
+    #saveMessage(remoteJid,messageText)
+    {
+        this.#checkFormatOfInput(remoteJid,messageText);
+    }
     
     async run() {
         this.#socket.ev.process(async (events) => {
@@ -72,15 +114,24 @@ class Bot {
           }
     
           if (events["messages.upsert"]) {
-            const { messages } = events["messages.upsert"];
-            
-            messages.forEach(async (msg) => {
+            const {messages,type}  = events["messages.upsert"];
+            if(type === "append")
+            {
+              return;
+            }
+            // console.log(JSON.stringify(messages, undefined, 2))
+            // console.log(type)
+         
+            messages.map(async (msg) => {
               const { key, message } = msg;
-              const remoteJid = key["remoteJid"] 
-              const messageText = message["conversation"]
-              console.log(remoteJid);
-              console.log(messageText);
-              await this.#socket.sendMessage(remoteJid, { text: 'Reminder Noted : ' + messageText })
+              const text = this.#getText(key, message);
+              // console.log("text : before "  + text);
+
+              if (!message || text === "" ){
+                // console.log('message _ '  + message);
+                return;
+              }
+              this.#saveMessage(key.remoteJid,text);
             });
           }
         });
