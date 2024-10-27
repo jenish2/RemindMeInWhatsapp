@@ -3,6 +3,8 @@ const {
     DisconnectReason,
     useMultiFileAuthState,
 } = require("@whiskeysockets/baileys");
+const schedule = require('node-schedule');
+
 
 class Bot {
     #socket;
@@ -13,6 +15,17 @@ class Bot {
     constructor(config){
         this.#authFolder = config.authFolder || "auth";
     }
+    
+    async  #scheduleReminderCheck() {
+      schedule.scheduleJob('*/1 * * * *', async () => {
+          await this.#sendReminders();
+      });
+    }
+    async  #sendReminders() {
+      this.#sendMessage('919081826363@s.whatsapp.net','reminder',{quote : 'reminder'});
+      console.log('qeqweqe reminder is herer!!!')
+    } 
+  
 
     async connect() {
         const { state, saveCreds } = await useMultiFileAuthState(this.#authFolder);
@@ -135,6 +148,7 @@ class Bot {
             });
           }
         });
+        this.#scheduleReminderCheck();
       }    
 }
 

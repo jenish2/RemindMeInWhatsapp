@@ -12,3 +12,4 @@ const bot = new Bot(botConfig);
     await bot.connect();
     await bot.run();
 })();
+
